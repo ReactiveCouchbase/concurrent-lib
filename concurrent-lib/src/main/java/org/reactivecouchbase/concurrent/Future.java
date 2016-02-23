@@ -21,12 +21,12 @@ public class Future<T> {
     List<Action<Try<T>>> callbacks = new ArrayList<>();
     final ExecutorService ec;
     final Promise<T> promise;
-    final java.util.concurrent.Future<T> fuuuu;
+    final java.util.concurrent.Future<T> future;
 
     Future(final Promise<T> promise, ExecutorService ec) {
         this.ec = ec;
         this.promise = promise;
-        this.fuuuu = new java.util.concurrent.Future<T>() {
+        this.future = new java.util.concurrent.Future<T>() {
             @Override
             public boolean cancel(boolean b) {
                 throw new IllegalAccessError("You can't stop the future !!!");
@@ -56,8 +56,7 @@ public class Future<T> {
                 }
                 Try<T> tr = promise.internalResult.get();
                 if (tr == null) {
-                    // wut ???
-                    return null;
+                    return null; // should not be null
                 }
                 return tr.get();
             }
@@ -81,7 +80,7 @@ public class Future<T> {
     }
 
     public java.util.concurrent.Future<T> toJavaFuture() {
-        return fuuuu;
+        return future;
     }
 
     void triggerCallbacks() {
@@ -95,7 +94,7 @@ public class Future<T> {
     }
 
     public Future<T> andThen(final Function<Try<T>, Unit> callback, ExecutorService ec) {
-        final Promise<T> promise = new Promise<T>();
+        final Promise<T> promise = new Promise<>();
         this.onComplete(r -> {
             callback.apply(r);
             promise.complete(r);
@@ -143,7 +142,7 @@ public class Future<T> {
     }
 
     public <B> Future<B> map(final Function<T, B> map, ExecutorService ec) {
-        final Promise<B> promise = new Promise<B>();
+        final Promise<B> promise = new Promise<>();
         this.onComplete(result -> {
             for (Throwable t : result.asFailure()) {
                 promise.failure(t);
@@ -160,7 +159,7 @@ public class Future<T> {
     }
 
     public Future<T> filter(final Function<T, Boolean> predicate, ExecutorService ec) {
-        final Promise<T> promise = new Promise<T>();
+        final Promise<T> promise = new Promise<>();
         this.onComplete(result -> {
             for (Throwable t : result.asFailure()) {
                 promise.failure(t);
@@ -179,7 +178,7 @@ public class Future<T> {
     }
 
     public Future<T> filterNot(final Function<T, Boolean> predicate, ExecutorService ec) {
-        final Promise<T> promise = new Promise<T>();
+        final Promise<T> promise = new Promise<>();
         this.onComplete(result -> {
             for (Throwable t : result.asFailure()) {
                 promise.failure(t);
@@ -198,7 +197,7 @@ public class Future<T> {
     }
 
     public <B> Future<B> flatMap(final Function<T, Future<B>> map, final ExecutorService ec) {
-        final Promise<B> promise = new Promise<B>();
+        final Promise<B> promise = new Promise<>();
         this.onComplete(result -> {
             for (Throwable t : result.asFailure()) {
                 promise.failure(t);
@@ -231,7 +230,7 @@ public class Future<T> {
     }
 
     public <S> Future<S> transform(final Function<T, S> block, final Function<Throwable, Throwable> errorBlock, ExecutorService ec) {
-        final Promise<S> promise = new Promise<S>();
+        final Promise<S> promise = new Promise<>();
         this.onComplete(tTry -> {
             for (final Throwable t : tTry.asFailure()) {
                 promise.complete(Try.apply((Function<Unit, S>) unit -> {
@@ -246,7 +245,7 @@ public class Future<T> {
     }
 
     public <U> Future<U> recover(final Function<Throwable, U> block, ExecutorService ec) {
-        final Promise<U> promise = new Promise<U>();
+        final Promise<U> promise = new Promise<>();
         this.onComplete(v -> {
             promise.complete(v.recover(block));
         }, ec);
@@ -254,7 +253,7 @@ public class Future<T> {
     }
 
     public Future<T> recoverWith(final Function<Throwable, Future<T>> block, final ExecutorService ec) {
-        final Promise<T> promise = new Promise<T>();
+        final Promise<T> promise = new Promise<>();
         this.onComplete(v -> {
             for (final Throwable t : v.asFailure()) {
                 try {
@@ -273,7 +272,7 @@ public class Future<T> {
     }
 
     public Future<T> fallbackTo(final Future<T> that, final ExecutorService ec) {
-        final Promise<T> p = new Promise<T>();
+        final Promise<T> p = new Promise<>();
         this.onComplete(tTry -> {
             for (Throwable t : tTry.asFailure()) {
                 that.onComplete(uTry -> {
@@ -375,7 +374,7 @@ public class Future<T> {
     }
 
     public static <T> Future<T> firstCompletedOf(final List<Future<T>> futures, final ExecutorService ec) {
-        final Promise<T> result = new Promise<T>();
+        final Promise<T> result = new Promise<>();
         for (Future<T> future : futures) {
             future.onSuccess(t -> {
                 result.trySuccess(t);
@@ -385,8 +384,8 @@ public class Future<T> {
     }
 
     public static <T> Future<List<T>> sequence(final List<Future<T>> futures, final ExecutorService ec) {
-        final Promise<List<T>> result = new Promise<List<T>>();
-        final List<T> results = Collections.synchronizedList(new ArrayList<T>());
+        final Promise<List<T>> result = new Promise<>();
+        final List<T> results = Collections.synchronizedList(new ArrayList<>());
         final CountDownLatch latch = new CountDownLatch(futures.size());
         for (Future<T> future : futures) {
             future.onComplete(tTry -> {
@@ -424,7 +423,7 @@ public class Future<T> {
     }
 
     public static <T> Future<T> in(Long in, TimeUnit unit, final Function<Void, T> block, ScheduledExecutorService ec) {
-        final Promise<T> promise = new Promise<T>(ec);
+        final Promise<T> promise = new Promise<>(ec);
         ec.schedule((Runnable) () -> {
             try {
                 promise.success(block.apply(null));
@@ -436,7 +435,7 @@ public class Future<T> {
     }
 
     public static <T> Future<T> async(final Function<Void, T> block, ExecutorService ec) {
-        final Promise<T> promise = new Promise<T>(ec);
+        final Promise<T> promise = new Promise<>(ec);
         ec.submit((Runnable) () -> {
             try {
                 promise.success(block.apply(null));
@@ -448,7 +447,7 @@ public class Future<T> {
     }
 
     public static Future<Unit> async(final Runnable block, ExecutorService ec) {
-        final Promise<Unit> promise = new Promise<Unit>(ec);
+        final Promise<Unit> promise = new Promise<>(ec);
         ec.submit((Runnable) () -> {
             try {
                 block.run();

@@ -11,11 +11,11 @@ import java.util.function.Predicate;
 public class Ref<T> {
 
     public static <T> Ref<T> empty() {
-        return new Ref<T>(IdGenerators.generateUUID());
+        return new Ref<>(IdGenerators.generateUUID());
     }
 
     public static <T> Ref<T> of(T value) {
-        return new Ref<T>(IdGenerators.generateUUID(), Option.some(value));
+        return new Ref<>(IdGenerators.generateUUID(), Option.some(value));
     }
 
     public static <T> Ref<T> empty(String name) {

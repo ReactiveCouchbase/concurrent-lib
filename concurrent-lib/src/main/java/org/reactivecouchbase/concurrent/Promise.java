@@ -102,13 +102,13 @@ public class Promise<T> {
     }
 
     public static <T> Promise<T> failed(Throwable exception) {
-        Promise<T> promise = new Promise<T>();
+        Promise<T> promise = new Promise<>();
         promise.failure(exception);
         return promise;
     }
 
     public static <T> Promise<T> successful(T result) {
-        Promise<T> promise = new Promise<T>();
+        Promise<T> promise = new Promise<>();
         promise.success(result);
         return promise;
     }

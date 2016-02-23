@@ -43,6 +43,5 @@ object ApplicationBuild extends Build {
       pomIncludeRepository := { _ => false },
       publishArtifact in (Compile, packageDoc) := false,
       publishArtifact in packageDoc := false
-      //testOptions += Tests.Argument(TestFrameworks.JUnit, "-q", "-v")
     )
 }
