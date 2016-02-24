@@ -89,6 +89,18 @@ public class Future<T> {
         return completableFuture;
     }
 
+    public java.util.concurrent.CompletableFuture<T> toJdkCompletableFuture(ExecutorService ec) {
+        CompletableFuture<T> completableFuture = new CompletableFuture<>();
+        this.onComplete(tTry -> {
+            if (tTry.isSuccess()) {
+                completableFuture.complete(tTry.get());
+            } else {
+                completableFuture.completeExceptionally(tTry.asFailure().get());
+            }
+        }, ec);
+        return completableFuture;
+    }
+
     public static <T> Future<T> fromJdkCompletableFuture(java.util.concurrent.CompletableFuture<T> completableFuture) {
         Promise<T> p = new Promise<>();
         completableFuture.whenComplete((value, exception) -> {
