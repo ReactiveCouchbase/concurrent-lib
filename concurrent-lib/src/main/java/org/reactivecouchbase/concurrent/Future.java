@@ -7,13 +7,7 @@ import org.reactivecouchbase.functional.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.function.Function;
 
 public class Future<T> {
@@ -79,8 +73,32 @@ public class Future<T> {
         return promise.isCompleted();
     }
 
-    public java.util.concurrent.Future<T> toJavaFuture() {
+    public java.util.concurrent.Future<T> toJdkFuture() {
         return future;
+    }
+
+    public java.util.concurrent.CompletableFuture<T> toJdkCompletableFuture() {
+        CompletableFuture<T> completableFuture = new CompletableFuture<>();
+        this.onComplete(tTry -> {
+            if (tTry.isSuccess()) {
+                completableFuture.complete(tTry.get());
+            } else {
+                completableFuture.completeExceptionally(tTry.asFailure().get());
+            }
+        });
+        return completableFuture;
+    }
+
+    public static <T> Future<T> fromJdkCompletableFuture(java.util.concurrent.CompletableFuture<T> completableFuture) {
+        Promise<T> p = new Promise<>();
+        completableFuture.whenComplete((value, exception) -> {
+           if (value != null) {
+               p.trySuccess(value);
+           } else {
+               p.tryFailure(exception);
+           }
+        });
+        return p.future();
     }
 
     void triggerCallbacks() {
@@ -233,12 +251,12 @@ public class Future<T> {
         final Promise<S> promise = new Promise<>();
         this.onComplete(tTry -> {
             for (final Throwable t : tTry.asFailure()) {
-                promise.complete(Try.apply((Function<Unit, S>) unit -> {
+                promise.complete(Try.apply(() -> {
                     throw Throwables.propagate(errorBlock.apply(t));
                 }));
             }
             for (final T value : tTry.asSuccess()) {
-                promise.complete(Try.apply(unit -> block.apply(value)));
+                promise.complete(Try.apply(() -> block.apply(value)));
             }
         }, ec);
         return promise.future();
@@ -467,7 +485,7 @@ public class Future<T> {
         return new Promise<T>().success(result).future();
     }
 
-    public static <T> Future<T> from(final java.util.concurrent.Future<T> future, final ScheduledExecutorService ec) {
+    public static <T> Future<T> fromJdkFuture(final java.util.concurrent.Future<T> future, final ScheduledExecutorService ec) {
         final Promise<T> promise = new Promise<T>();
         Runnable wait = new Runnable() {
             @Override

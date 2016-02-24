@@ -7,6 +7,7 @@ import org.reactivecouchbase.functional.Unit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public class Ref<T> {
 
@@ -64,9 +65,9 @@ public class Ref<T> {
         return ref.get();
     }
 
-    public Ref<T> setIfEmpty(Function<Unit, T> f) {
+    public Ref<T> setIfEmpty(Supplier<T> f) {
         if (isEmpty()) {
-            set(f.apply(Unit.unit()));
+            set(f.get());
         }
         return this;
     }
@@ -99,7 +100,7 @@ public class Ref<T> {
         return new Ref<>(name, ref.get().map(f));
     }
 
-    public <B> B fold(Function<Unit, B> ifEmpty, Function<T, B> f) {
+    public <B> B fold(Supplier<B> ifEmpty, Function<T, B> f) {
         return ref.get().fold(ifEmpty, f);
     }
 
