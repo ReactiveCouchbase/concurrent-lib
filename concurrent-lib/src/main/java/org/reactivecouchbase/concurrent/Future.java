@@ -8,11 +8,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class Future<T> {
 
-    List<Action<Try<T>>> callbacks = new ArrayList<>();
+    List<Consumer<Try<T>>> callbacks = new ArrayList<>();
     final ExecutorService ec;
     final Promise<T> promise;
     final java.util.concurrent.Future<T> future;
@@ -114,13 +116,13 @@ public class Future<T> {
     }
 
     void triggerCallbacks() {
-        for (final Action<Try<T>> block : callbacks) {
-            ec.submit((Runnable) () -> block.apply(promise.internalResult.get()));
+        for (final Consumer<Try<T>> block : callbacks) {
+            ec.submit((Runnable) () -> block.accept(promise.internalResult.get()));
         }
     }
 
-    public Future<T> andThen(final Action<Try<T>> callback, ExecutorService ec) {
-        return andThen(Functions.fromAction(callback), ec);
+    public Future<T> andThen(final Consumer<Try<T>> callback, ExecutorService ec) {
+        return andThen(Functions.fromConsumer(callback), ec);
     }
 
     public Future<T> andThen(final Function<Try<T>, Unit> callback, ExecutorService ec) {
@@ -132,23 +134,19 @@ public class Future<T> {
         return promise.future();
     }
 
-    public void onComplete(final Action<Try<T>> callback, ExecutorService ec) {
+    public void onComplete(final Consumer<Try<T>> callback, ExecutorService ec) {
         synchronized (this) {
             if (!isDone()) {
                 callbacks.add(callback);
             }
         }
         if (isDone()) {
-            ec.submit((Runnable) () -> callback.apply(promise.internalResult.get()));
+            ec.submit((Runnable) () -> callback.accept(promise.internalResult.get()));
         }
     }
 
-    public void onComplete(final Function<Try<T>, Unit> callback, ExecutorService ec) {
-        onComplete(Functions.toAction(callback), ec);
-    }
-
-    public void onSuccess(final Action<T> callback, ExecutorService ec) {
-        onSuccess(Functions.fromAction(callback), ec);
+    public void onSuccess(final Consumer<T> callback, ExecutorService ec) {
+        onSuccess(Functions.fromConsumer(callback), ec);
     }
 
     public void onSuccess(final Function<T, Unit> callback, ExecutorService ec) {
@@ -159,8 +157,8 @@ public class Future<T> {
         }, ec);
     }
 
-    public void onError(final Action<Throwable> callback, ExecutorService ec) {
-        onError(Functions.fromAction(callback), ec);
+    public void onError(final Consumer<Throwable> callback, ExecutorService ec) {
+        onError(Functions.fromConsumer(callback), ec);
     }
 
     public void onError(final Function<Throwable, Unit> callback, ExecutorService ec) {
@@ -322,22 +320,18 @@ public class Future<T> {
     }
 
     /* Resulting Future will use the  Executor from the current Future */
-    public Future<T> andThen(final Action<Try<T>> callback) {
+    public Future<T> andThen(final Consumer<Try<T>> callback) {
         return andThen(callback, ec);
     }
 
     /* Resulting Future will use the  Executor from the current Future */
-    public void onComplete(final Action<Try<T>> callback) {
-        onComplete(Functions.fromAction(callback));
-    }
-
-    public void onComplete(final Function<Try<T>, Unit> callback) {
-        onComplete(callback, ec);
+    public void onComplete(final Consumer<Try<T>> callback) {
+        onComplete(callback);
     }
 
     /* Resulting Future will use the  Executor from the current Future */
-    public void onSuccess(final Action<T> callback) {
-        onSuccess(Functions.fromAction(callback));
+    public void onSuccess(final Consumer<T> callback) {
+        onSuccess(Functions.fromConsumer(callback));
     }
 
     public void onSuccess(final Function<T, Unit> callback) {
@@ -345,8 +339,8 @@ public class Future<T> {
     }
 
     /* Resulting Future will use the  Executor from the current Future */
-    public void onError(final Action<Throwable> callback) {
-        onError(Functions.fromAction(callback));
+    public void onError(final Consumer<Throwable> callback) {
+        onError(Functions.fromConsumer(callback));
     }
 
     public void onError(final Function<Throwable, Unit> callback) {
@@ -442,21 +436,21 @@ public class Future<T> {
     }
 
     public static Future<Unit> in(Long in, TimeUnit unit, final Runnable block, ScheduledExecutorService ec) {
-        return in(in, unit, aVoid -> {
+        return in(in, unit, () -> {
             block.run();
             return Unit.unit();
         }, ec);
     }
 
-    public static <T> Future<T> in(Duration duration, final Function<Void, T> block, ScheduledExecutorService ec) {
+    public static <T> Future<T> in(Duration duration, final Supplier<T> block, ScheduledExecutorService ec) {
         return in(duration.value, duration.unit, block, ec);
     }
 
-    public static <T> Future<T> in(Long in, TimeUnit unit, final Function<Void, T> block, ScheduledExecutorService ec) {
+    public static <T> Future<T> in(Long in, TimeUnit unit, final Supplier<T> block, ScheduledExecutorService ec) {
         final Promise<T> promise = new Promise<>(ec);
         ec.schedule((Runnable) () -> {
             try {
-                promise.success(block.apply(null));
+                promise.success(block.get());
             } catch (Throwable e) {
                 promise.failure(e);
             }
@@ -464,11 +458,11 @@ public class Future<T> {
         return promise.future();
     }
 
-    public static <T> Future<T> async(final Function<Void, T> block, ExecutorService ec) {
+    public static <T> Future<T> async(final Supplier<T> block, ExecutorService ec) {
         final Promise<T> promise = new Promise<>(ec);
         ec.submit((Runnable) () -> {
             try {
-                promise.success(block.apply(null));
+                promise.success(block.get());
             } catch (Throwable e) {
                 promise.failure(e);
             }
@@ -498,7 +492,7 @@ public class Future<T> {
     }
 
     public static <T> Future<T> fromJdkFuture(final java.util.concurrent.Future<T> future, final ScheduledExecutorService ec) {
-        final Promise<T> promise = new Promise<T>();
+        final Promise<T> promise = new Promise<>();
         Runnable wait = new Runnable() {
             @Override
             public void run() {
@@ -524,6 +518,6 @@ public class Future<T> {
     }
 
     public static <T> Future<T> timeout(final T some, Long in, TimeUnit unit, ScheduledExecutorService ec) {
-        return in(in, unit, aVoid -> some, ec);
+        return in(in, unit, () -> some, ec);
     }
 }

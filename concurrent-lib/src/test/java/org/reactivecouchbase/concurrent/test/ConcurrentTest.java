@@ -7,8 +7,8 @@ import org.reactivecouchbase.concurrent.Await;
 import org.reactivecouchbase.concurrent.Future;
 import org.reactivecouchbase.concurrent.NamedExecutors;
 import org.reactivecouchbase.concurrent.Promise;
-import org.reactivecouchbase.functional.Action;
 import org.reactivecouchbase.functional.Try;
+import org.reactivecouchbase.functional.Unit;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +40,7 @@ public class ConcurrentTest {
     @Test
     public void testFuture() throws Exception {
         final CountDownLatch latch = new CountDownLatch(9);
-        Future<Void> future = Future.async((Action<Void>) aVoid -> {
+        Future<Unit> future = Future.async(() -> {
             System.out.println("Async 1");
             try {
                 Thread.sleep(1000);
@@ -48,12 +48,14 @@ public class ConcurrentTest {
                 e.printStackTrace();
             }
             latch.countDown();
-        }, ec).map((Action<Void>) aVoid -> {
+        }, ec).map(aVoid -> {
             System.out.println("Map 1");
             latch.countDown();
-        }, ec).map((Action<Void>) aVoid -> {
+            return null;
+        }, ec).map(aVoid -> {
             System.out.println("Map 2");
             latch.countDown();
+            return null;
         }, ec).filter(aVoid -> {
             System.out.println("Filter");
             latch.countDown();
@@ -65,7 +67,7 @@ public class ConcurrentTest {
         }, ec).flatMap(aVoid -> {
             System.out.println("Flatmap");
             latch.countDown();
-            return Future.async((Action<Void>) aVoid1 -> {
+            return Future.async(() -> {
                 System.out.println("Async 2");
                 latch.countDown();
             }, ec);
@@ -86,7 +88,7 @@ public class ConcurrentTest {
     public void testFutureError() throws Exception {
         final CountDownLatch latch = new CountDownLatch(6);
         final CountDownLatch errorlatch = new CountDownLatch(1);
-        Future<Void> future = Future.async((Action<Void>) aVoid -> {
+        Future<Void> future = Future.async(() -> {
             try {
                 Thread.sleep(1000);
             } catch (Exception e) {
@@ -94,7 +96,7 @@ public class ConcurrentTest {
             }
             latch.countDown();
             throw new RuntimeException("Damn it !!!");
-        }, ec).map((Function<Void, Void>) aVoid -> {
+        }, ec).map(aVoid -> {
             errorlatch.countDown();
             return null;
         }, ec).recover((Function<Throwable, Void>) throwable -> {
@@ -106,7 +108,7 @@ public class ConcurrentTest {
         }, ec);
         future.recoverWith(throwable -> {
             latch.countDown();
-            return Future.async((Function<Void, Void>) aVoid -> {
+            return Future.async(() -> {
                 latch.countDown();
                 return null;
             }, ec);
@@ -123,12 +125,14 @@ public class ConcurrentTest {
     @Test
     public void testPromise() throws Exception {
         final CountDownLatch latch = new CountDownLatch(8);
-        Future<Void> future = Promise.<Void>successful(null).future().map((Action<Void>) aVoid -> {
+        Future<Unit> future = Promise.<Void>successful(null).future().map(aVoid -> {
             System.out.println("Map 1");
             latch.countDown();
-        }, ec).map((Action<Void>) aVoid -> {
+            return null;
+        }, ec).map(aVoid -> {
             System.out.println("Map 2");
             latch.countDown();
+            return null;
         }, ec).filter(aVoid -> {
             System.out.println("Filter");
             latch.countDown();
@@ -140,7 +144,7 @@ public class ConcurrentTest {
         }, ec).flatMap(aVoid -> {
             System.out.println("Flatmap");
             latch.countDown();
-            return Future.async((Action<Void>) aVoid1 -> {
+            return Future.async(() -> {
                 System.out.println("Async 2");
                 latch.countDown();
             }, ec);
@@ -175,11 +179,11 @@ public class ConcurrentTest {
         }, ec);
         future.recoverWith(throwable -> {
             latch.countDown();
-            return Future.async((Function<Void, Void>) aVoid -> {
+            return Future.async(() -> {
                 latch.countDown();
                 return null;
             }, ec);
-        }, ec).map((Function<Void, Void>) aVoid -> {
+        }, ec).map(v -> {
             latch.countDown();
             return null;
         }, ec);
@@ -203,7 +207,7 @@ public class ConcurrentTest {
         Future<Void> fu1  = Future.timeout(null, 1L, TimeUnit.SECONDS, sched);
         Future<Void> fu2  = Future.timeout(null, 2L, TimeUnit.SECONDS, sched);
         Future<Void> fu3  = Future.timeout(null, 500L, TimeUnit.MILLISECONDS, sched);
-        Future.sequence(newArrayList(fu1, fu2, fu3), sched).onComplete((Action<Try<List<Void>>>) listTry -> latch.countDown(), sched);
+        Future.sequence(newArrayList(fu1, fu2, fu3), sched).onComplete(listTry -> latch.countDown(), sched);
         latch.await(5L, TimeUnit.SECONDS);
         Assert.assertEquals(0, latch.getCount());
 
