@@ -125,7 +125,7 @@ public class Future<T> {
         return andThen(Functions.fromConsumer(callback), ec);
     }
 
-    public Future<T> andThen(final Function<Try<T>, Unit> callback, ExecutorService ec) {
+    private Future<T> andThen(final Function<Try<T>, Unit> callback, ExecutorService ec) {
         final Promise<T> promise = new Promise<>();
         this.onComplete(r -> {
             callback.apply(r);
@@ -519,5 +519,53 @@ public class Future<T> {
 
     public static <T> Future<T> timeout(final T some, Long in, TimeUnit unit, ScheduledExecutorService ec) {
         return in(in, unit, () -> some, ec);
+    }
+
+    private static <T> void retryPromise(final int times, final int wait, final boolean expo, final Promise<T> promise, final Option<Throwable> failure, final Supplier<Future<T>> f, final ScheduledExecutorService ec) {
+
+        if (times == 0) {
+            if (failure.isDefined()) {
+                promise.tryFailure(failure.get());
+            } else {
+                promise.tryFailure(new RuntimeException("Failure, but lost track of exception :-("));
+            }
+        } else {
+            Future<T> future = f.get();
+            if (future == null) {
+                promise.tryFailure(new NullPointerException("Function is return a null future"));
+            } else {
+                future.onComplete(tTry -> {
+                    if (tTry.isSuccess()) {
+                        promise.trySuccess(tTry.get());
+                    } else {
+                        System.out.println("waiting " + wait + " milliseconds");
+                        Future.in(new Duration(wait, TimeUnit.MILLISECONDS), () -> {
+                            int newWait = wait;
+                            if (wait == 0 && expo) {
+                                newWait = 1;
+                            } else {
+                                if (expo) newWait = newWait + wait;
+                            }
+                            retryPromise(times - 1, newWait, expo, promise, tTry.error(), f, ec);
+                            return Unit.unit();
+                        }, ec);
+                    }
+                }, ec);
+            }
+        }
+    }
+
+    public static <T> Future<T> retry(int times, boolean exponential, Supplier<Future<T>> f, ScheduledExecutorService ec) {
+        Promise<T> promise = new Promise<T>();
+        retryPromise(times, 0, exponential, promise, Option.<Throwable>none(), f, ec);
+        return promise.future();
+    }
+
+    public static <T> Future<T> retryExponential(int times, Supplier<Future<T>> f, ScheduledExecutorService ec) {
+        return retry(times, true, f, ec);
+    }
+
+    public static <T> Future<T> retry(int times, Supplier<Future<T>> f, ScheduledExecutorService ec) {
+        return retry(times, false, f, ec);
     }
 }
