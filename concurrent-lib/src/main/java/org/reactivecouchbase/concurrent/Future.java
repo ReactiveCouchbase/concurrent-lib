@@ -326,7 +326,7 @@ public class Future<T> {
 
     /* Resulting Future will use the  Executor from the current Future */
     public void onComplete(final Consumer<Try<T>> callback) {
-        onComplete(callback);
+        onComplete(callback, ec);
     }
 
     /* Resulting Future will use the  Executor from the current Future */
