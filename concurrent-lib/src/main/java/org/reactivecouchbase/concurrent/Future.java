@@ -397,6 +397,10 @@ public class Future<T> {
         return fallbackTo(that, ec);
     }
 
+    public <W> W wrap(Function<Future<T>, W> wrapper) {
+        return wrapper.apply(this);
+    }
+
     public static <T> Future<T> firstCompletedOf(final List<Future<T>> futures, final ExecutorService ec) {
         final Promise<T> result = new Promise<>();
         for (Future<T> future : futures) {
