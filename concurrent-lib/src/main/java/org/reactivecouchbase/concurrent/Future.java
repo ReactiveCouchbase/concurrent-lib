@@ -177,9 +177,9 @@ public class Future<T> {
             }
             for (T value : result.asSuccess()) {
                 try {
-                    promise.success(map.apply(value));
+                    promise.trySuccess(map.apply(value));
                 } catch (Exception ex) {
-                    promise.failure(ex);
+                    promise.tryFailure(ex);
                 }
             }
         }, ec);
@@ -195,10 +195,10 @@ public class Future<T> {
             for (T value : result.asSuccess()) {
                 try {
                     if (predicate.apply(value)) {
-                        promise.success(value);
+                        promise.trySuccess(value);
                     }
                 } catch (Exception ex) {
-                    promise.failure(ex);
+                    promise.tryFailure(ex);
                 }
             }
         }, ec);
@@ -214,10 +214,10 @@ public class Future<T> {
             for (T value : result.asSuccess()) {
                 try {
                     if (!predicate.apply(value)) {
-                        promise.success(value);
+                        promise.trySuccess(value);
                     }
                 } catch (Exception ex) {
-                    promise.failure(ex);
+                    promise.tryFailure(ex);
                 }
             }
         }, ec);
@@ -235,10 +235,10 @@ public class Future<T> {
                     Future<B> fut = map.apply(value);
                     fut.onComplete(bTry -> {
                         for (Throwable t : bTry.asFailure()) {
-                            promise.failure(t);
+                            promise.tryFailure(t);
                         }
                         for (B valueB : bTry.asSuccess()) {
-                            promise.success(valueB);
+                            promise.trySuccess(valueB);
                         }
                     }, ec);
                 } catch (Exception ex) {
@@ -419,18 +419,18 @@ public class Future<T> {
             future.onComplete(tTry -> {
                 latch.countDown();
                 for (Throwable t : tTry.asFailure()) {
-                    result.failure(t);
+                    result.tryFailure(t);
                 }
                 for (T value : tTry.asSuccess()) {
                     results.add(value);
                 }
                 if (latch.getCount() == 0) {
-                    result.success(results);
+                    result.trySuccess(results);
                 }
             }, ec);
         }
         if (futures.isEmpty()) {
-            result.success(results);
+            result.trySuccess(results);
         }
         return result.future();
     }
@@ -454,9 +454,9 @@ public class Future<T> {
         final Promise<T> promise = new Promise<>(ec);
         ec.schedule((Runnable) () -> {
             try {
-                promise.success(block.get());
+                promise.trySuccess(block.get());
             } catch (Throwable e) {
-                promise.failure(e);
+                promise.tryFailure(e);
             }
         }, in, unit);
         return promise.future();
@@ -466,9 +466,9 @@ public class Future<T> {
         final Promise<T> promise = new Promise<>(ec);
         ec.submit((Runnable) () -> {
             try {
-                promise.success(block.get());
+                promise.trySuccess(block.get());
             } catch (Throwable e) {
-                promise.failure(e);
+                promise.tryFailure(e);
             }
         });
         return promise.future();
@@ -479,9 +479,9 @@ public class Future<T> {
         ec.submit((Runnable) () -> {
             try {
                 block.run();
-                promise.success(Unit.unit());
+                promise.trySuccess(Unit.unit());
             } catch (Throwable e) {
-                promise.failure(e);
+                promise.tryFailure(e);
             }
         });
         return promise.future();
