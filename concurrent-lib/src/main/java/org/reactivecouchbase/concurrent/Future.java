@@ -3,6 +3,8 @@ package org.reactivecouchbase.concurrent;
 import org.reactivecouchbase.common.Duration;
 import org.reactivecouchbase.common.Throwables;
 import org.reactivecouchbase.functional.*;
+import rx.Observable;
+import rx.Single;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -77,6 +79,37 @@ public class Future<T> {
 
     public java.util.concurrent.Future<T> toJdkFuture() {
         return future;
+    }
+
+    public Observable<T> toObservable() { return toObservable(ec); }
+
+    public Observable<T> toObservable(ExecutorService ec) {
+        return Observable.create(subscriber -> {
+            this.andThen(ttry -> {
+                for(T success : ttry.asSuccess()) {
+                    subscriber.onNext(success);
+                    subscriber.onCompleted();
+                }
+                for (Throwable t : ttry.asFailure()) {
+                    subscriber.onError(t);
+                }
+            }, ec);
+        });
+    }
+
+    public Single<T> toSingle() { return toSingle(ec); }
+
+    public Single<T> toSingle(ExecutorService ec) {
+        return Single.create(subscriber -> {
+            this.andThen(ttry -> {
+                for(T success : ttry.asSuccess()) {
+                    subscriber.onSuccess(success);
+                }
+                for (Throwable t : ttry.asFailure()) {
+                    subscriber.onError(t);
+                }
+            }, ec);
+        });
     }
 
     public java.util.concurrent.CompletableFuture<T> toJdkCompletableFuture() {
