@@ -332,6 +332,82 @@ public class Future<T> {
         return promise.future();
     }
 
+    public <X> Future<X> fold(Function<Throwable, X> onError, Function<T, X> onSuccess) {
+        return fold(onError, onSuccess, this.ec);
+    }
+
+    public <X> Future<X> fold(Function<Throwable, X> onError, Function<T, X> onSuccess, final ExecutorService ec) {
+        final Promise<X> promise = new Promise<>();
+        this.onComplete(v -> {
+            for (final Throwable t : v.asFailure()) {
+                promise.trySuccess(onError.apply(t));
+            }
+            for (final T value : v.asSuccess()) {
+                promise.trySuccess(onSuccess.apply(value));
+            }
+        }, ec);
+        return promise.future();
+    }
+
+    public <X> Future<X> foldM(Function<Throwable, Future<X>> onError, Function<T, Future<X>> onSuccess) {
+        return foldM(onError, onSuccess, this.ec);
+    }
+
+    public <X> Future<X> foldM(Function<Throwable, Future<X>> onError, Function<T, Future<X>> onSuccess, final ExecutorService ec) {
+        final Promise<X> promise = new Promise<>();
+        this.onComplete(v -> {
+            for (final Throwable t : v.asFailure()) {
+                onError.apply(t).andThen(ttry -> {
+                   if (ttry.isFailure()) {
+                       promise.tryFailure(ttry.asFailure().get());
+                   } else {
+                       promise.trySuccess(ttry.asSuccess().get());
+                   }
+                });
+            }
+            for (final T value : v.asSuccess()) {
+                onSuccess.apply(value).andThen(ttry -> {
+                    if (ttry.isFailure()) {
+                        promise.tryFailure(ttry.asFailure().get());
+                    } else {
+                        promise.trySuccess(ttry.asSuccess().get());
+                    }
+                });
+            }
+        }, ec);
+        return promise.future();
+    }
+
+    public <X> Future<X> transform(Function<Try<T>, X> trans) {
+        return transform(trans, this.ec);
+    }
+
+    public <X> Future<X> transform(Function<Try<T>, X> trans, final ExecutorService ec) {
+        final Promise<X> promise = new Promise<>();
+        this.onComplete(v -> {
+            promise.trySuccess(trans.apply(v));
+        }, ec);
+        return promise.future();
+    }
+
+    public <X> Future<X> transformM(Function<Try<T>, Future<X>> trans) {
+        return this.transformM(trans, this.ec);
+    }
+
+    public <X> Future<X> transformM(Function<Try<T>, Future<X>> trans, final ExecutorService ec) {
+        final Promise<X> promise = new Promise<>();
+        this.onComplete(v -> {
+            trans.apply(v).andThen(ttry -> {
+                if (ttry.isFailure()) {
+                    promise.tryFailure(ttry.asFailure().get());
+                } else {
+                    promise.trySuccess(ttry.asSuccess().get());
+                }
+            });
+        }, ec);
+        return promise.future();
+    }
+
     public Future<T> fallbackTo(final Future<T> that, final ExecutorService ec) {
         final Promise<T> p = new Promise<>();
         this.onComplete(tTry -> {
