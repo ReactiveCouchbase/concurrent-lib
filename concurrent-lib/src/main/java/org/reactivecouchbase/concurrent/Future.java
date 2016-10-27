@@ -148,6 +148,14 @@ public class Future<T> {
         return p.future();
     }
 
+    public static <T> Future<T> from(java.util.concurrent.CompletableFuture<T> completableFuture) {
+        return Future.fromJdkCompletableFuture(completableFuture);
+    }
+
+    public static <T> Future<T> from(java.util.concurrent.CompletionStage<T> completableFuture) {
+        return Future.fromJdkCompletableFuture(completableFuture.toCompletableFuture());
+    }
+
     void triggerCallbacks() {
         for (final Consumer<Try<T>> block : callbacks) {
             ec.submit((Runnable) () -> block.accept(promise.internalResult.get()));
